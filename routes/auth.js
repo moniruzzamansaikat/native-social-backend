@@ -1,16 +1,17 @@
 const router = require('express').Router();
-const User = require('../models/User');
 const { signToken } = require('../utils/jwt');
-const { checkAuth } = require('../utils/checkAuth')
+const { checkAuth } = require('../utils/checkAuth');
+const { db } = require('../utils/db');
+const bcrypt = require('bcryptjs');
 
 // login 
 router.post('/login', async (req, res) => {
     const { username, password } = req.body;
     try {
-        const user = await User.findOne({ username });
+        const user = await db('users').where({ username }).first();
         if (!user) throw new Error('No account with this username!');
 
-        const matchedPassword = await user.comparePassword(password);
+        const matchedPassword = await bcrypt.compare(password, user.password);
         if (!matchedPassword) throw new Error('Password is incorrect');
 
         const token = signToken(user);
@@ -38,24 +39,24 @@ router.post('/register', async (req, res) => {
         if (password !== password2) throw new Error('Passwords do not match!');
 
         // find user with same username
-        let foundUser = await User.findOne({ username })
+        let foundUser = await db('users').where({ username }).first();
         if (foundUser) throw new Error('Username already exists!');
 
         // find user with same email
-        foundUser = await User.findOne({ email })
+        foundUser = await db('users').where({ email }).first();
         if (foundUser) throw new Error('Email already exists!');
 
         // create new user
-        const newUser = new User({
+        const newUser = {
             name,
             username,
             email,
-            password
-        });
+            password: await bcrypt.hash(password, 10)
+        };
 
-        // save user
-        const user = await newUser.save();
-        const token = signToken(user);
+        // insert user 
+        const id = await db('users').insert(newUser);
+        const token = signToken({ id, ...newUser });
 
         res.status(201).json({
             success: true,
@@ -70,7 +71,7 @@ router.post('/register', async (req, res) => {
 // fetch user data
 router.get('/me', checkAuth, async (req, res) => {
     try {
-        const user = await User.findById(req.user._id).select('-password');
+        const user = await db('users').where({ id: req.user.id }).first();
         res.status(200).send(user);
     } catch (error) {
         const { message } = error;

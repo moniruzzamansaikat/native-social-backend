@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('./utils/db');
 const express = require('express');
 const cors = require('cors');
 
@@ -18,8 +19,11 @@ if (process.env.NODE_ENV === 'development') {
 // routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
+app.use('/api/friends', require('./routes/friends'));
+app.get("*", (req, res) => res.status(404).send({
+    message: "Not Found"
+}))
 
 app.listen(process.env.PORT, () => {
-    require('./utils/db');
     console.log(`🚀 server is running port ${process.env.PORT}`);
 });
